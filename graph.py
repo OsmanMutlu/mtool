@@ -288,6 +288,8 @@ class Graph(object):
         self.edges = set();
         self.flavor = flavor;
         self.framework = framework;
+        self.intermediate_gold = []
+        self.gold_indexes = []
 
     def add_node(self, id = None, label = None,
                  properties = None, values = None,
@@ -447,7 +449,7 @@ class Graph(object):
         if self.framework:
             json["framework"] = self.framework;
         json["version"] = 1.0;
-        json["time"] = self.time.strftime("%Y-%m-%d");
+        json["time"] = self.time.strftime("%Y-%m-%d (%H:%M)");
         if self.input:
             json["input"] = self.input;
         tops = [node.id for node in self.nodes if node.is_top];
@@ -455,15 +457,22 @@ class Graph(object):
             json["tops"] = tops;
         json["nodes"] = [node.encode() for node in self.nodes];
         json["edges"] = [edge.encode() for edge in self.edges];
+        json["intermediate_gold"] = [node.encode() for node in self.intermediate_gold];
+        json["gold_indexes"] = self.gold_indexes
+        
         return json;
 
     @staticmethod
     def decode(json):
+        int_gold = []
         flavor = json.get("flavor", None)
         framework = json.get("framework", None)
         graph = Graph(json["id"], flavor, framework)
         graph.time = datetime.strptime(json["time"], "%Y-%m-%d (%H:%M)")
         graph.input = json.get("input", None)
+        if "gold_indexes" in json.keys():
+            graph.gold_indexes = json["gold_indexes"]
+
         for j in json["nodes"]:
             node = Node.decode(j)
             graph.add_node(node.id, node.label, node.properties,
@@ -472,6 +481,13 @@ class Graph(object):
             edge = Edge.decode(j)
             graph.add_edge(edge.src, edge.tgt, edge.lab, edge.normal,
                            edge.attributes, edge.values)
+
+        if "intermediate_gold" in json.keys():
+            for j in json["intermediate_gold"]:
+                node = Node.decode(j)
+                int_gold.append(node)
+
+        graph.intermediate_gold = int_gold
         tops = json.get("tops", [])
         for i in tops:
             graph.find_node(i).is_top = True

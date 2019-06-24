@@ -6,6 +6,7 @@ import argparse;
 import json;
 from pathlib import Path;
 import sys;
+import re
 
 from analyzer import analyze;
 
@@ -85,8 +86,61 @@ def read_graphs(stream, format = None,
 
   return graphs, overlays;
 
+
+def sorted_nicely(l):
+    # Copied from this post https://stackoverflow.com/questions/2669059/how-to-sort-alpha-numeric-set-in-python
+    def convert(text): return int(text) if text.isdigit() else text
+    def alphanum_key(key): return [convert(c) for c in re.split('([0-9]+)', key.lab)]
+    return sorted(l, key=alphanum_key)
+    
+def get_nodes_in_pre_order(graph, node, node_list):
+    node_list.append(node)
+    for edge in sorted_nicely(list(node.outgoing_edges)):
+        if edge.tgt not in [node.id for node in node_list]:
+            node_list = get_nodes_in_pre_order(graph, graph.find_node(edge.tgt), node_list)
+        else:
+            node_list.append(graph.find_node(edge.tgt))
+    return node_list
+
+def get_int_gold(graphs, out_file):
+    for graph in graphs:
+        new_nodes = []
+        top_node = None
+        for node in graph.nodes:
+            if node.is_top:
+                top_node = node
+                break
+
+        if not top_node:
+            print("No root for this graph")
+            print(graph)
+            sys.exit()
+
+        # Recursively traverse graph. Pre-order traversal. Does not traverse already traversed nodes.
+        new_nodes = get_nodes_in_pre_order(graph, top_node, new_nodes)
+
+        indexes = []
+        seen = {}
+        i = 1
+        for node in new_nodes:
+            if node.id not in seen:
+                seen[node.id] = i
+                indexes.append(i)
+                i += 1
+            else:
+                indexes.append(seen[node.id])
+
+        graph.intermediate_gold = new_nodes
+        graph.gold_indexes = indexes
+        json.dump(graph.encode(), open(out_file, "a"), indent = None, ensure_ascii = False)
+        with open(out_file, "a") as f:
+            f.write("\n")
+
+    return graphs
+  
 def main():
   parser = argparse.ArgumentParser(description = "MRP Graph Toolkit");
+  parser.add_argument("--int_gold", action = "store_true");
   parser.add_argument("--analyze", action = "store_true");
   parser.add_argument("--normalize", action = "append", default = []);
   parser.add_argument("--full", action = "store_true");
@@ -213,6 +267,13 @@ def main():
   if arguments.analyze:
     analyze(graphs);
 
+  if arguments.int_gold:
+      out_file = re.sub(r"(.*)\.mrp", r"\g<1>_with_int_gold.mrp", arguments.input.name)
+      if not out_file:
+          print("Please provide an mrp file if you want to get intermediate gold values!")
+          sys.exit()
+      get_int_gold(graphs, out_file)
+    
   if arguments.gold and arguments.score:
     if arguments.format is None: arguments.format = arguments.read;
     gold, _ = read_graphs(arguments.gold, format = arguments.format,
