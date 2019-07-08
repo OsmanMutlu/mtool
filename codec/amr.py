@@ -1,11 +1,12 @@
 import re
 import sys
+import ast
 
 from graph import Graph
 from smatch.amr import AMR;
 
 def amr_lines(fp, alignment):
-    id, snt, lines = None, None, [];
+    id, snt, lines, tokens, lemmas, pos_tags, ner_tags, abstract_map = None, None, [], None, None, None, None, None;
     alignment = read_alignment(alignment);
     for line in fp:
         line = line.strip();
@@ -18,7 +19,7 @@ def amr_lines(fp, alignment):
                     print("amr_lines(): missing alignment for graph #{}."
                           "".format(id), file = sys.stderr);
                     pass;
-                yield id, snt, " ".join(lines), \
+                yield id, snt, tokens, lemmas, pos_tags, ner_tags, abstract_map, " ".join(lines), \
                     mapping if mapping is not None and i == id else None;
             id, lines = None, []
         else:
@@ -26,7 +27,17 @@ def amr_lines(fp, alignment):
                 if line.startswith("# ::id"):
                     id = line.split()[2]
                 if line.startswith("# ::snt"):
-                   snt = line[8:].strip();
+                    snt = line[8:].strip();
+                if line.startswith("# ::tokens"):
+                    tokens = ast.literal_eval(line[11:].strip());
+                if line.startswith("# ::lemmas"):
+                    lemmas = ast.literal_eval(line[11:].strip());
+                if line.startswith("# ::pos_tags"):
+                    pos_tags = ast.literal_eval(line[13:].strip());
+                if line.startswith("# ::ner_tags"):
+                    ner_tags = ast.literal_eval(line[13:].strip());
+                if line.startswith("# ::abstract_map"):
+                    abstract_map = ast.literal_eval(line[17:].strip());
             else:
                 lines.append(line)
     if len(lines) > 0:
@@ -37,13 +48,13 @@ def amr_lines(fp, alignment):
             print("amr_lines(): missing alignment for graph #{}."
                   "".format(id), file = sys.stderr);
             pass;
-        yield id, snt, " ".join(lines), \
+        yield id, snt, tokens, lemmas, pos_tags, ner_tags, abstract_map, " ".join(lines), \
             mapping if mapping is not None and i == id else None;
 
 def read_alignment(stream):
     if stream is None:
         while True: yield None, None;
-    else: 
+    else:
         id = None;
         alignment = dict();
         for line in stream:
@@ -141,7 +152,7 @@ def convert_amr_id(id):
 def read(fp, full = False, reify = False,
          text = None, alignment = None, quiet = False):
     n = 0;
-    for id, snt, amr_line, mapping in amr_lines(fp, alignment):
+    for id, snt, tokens, lemmas, pos_tags, ner_tags, abstract_map, amr_line, mapping in amr_lines(fp, alignment):
         amr = AMR.parse_AMR_line(amr_line)
         if not amr:
             raise Exception("failed to parse #{} ({}); exit."
@@ -160,4 +171,14 @@ def read(fp, full = False, reify = False,
             graph.add_input(text, quiet = quiet);
         elif snt:
             graph.add_input(snt, quiet = quiet);
+        if tokens:
+            graph.add_tokens(tokens, quiet = quiet);
+        if lemmas:
+            graph.add_lemmas(lemmas, quiet = quiet);
+        if pos_tags:
+            graph.add_pos_tags(pos_tags, quiet = quiet);
+        if ner_tags:
+            graph.add_ner_tags(ner_tags, quiet = quiet);
+        if abstract_map:
+            graph.add_abstract_map(abstract_map, quiet = quiet);
         yield graph, overlay;

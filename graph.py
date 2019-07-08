@@ -115,7 +115,7 @@ class Node(object):
         elif node.properties is not None:
             count2 += len(node.properties);
         return both - count1 - count2, count1, both, count2;
-                   
+
     def encode(self):
         json = {"id": self.id};
         if self.label:
@@ -227,7 +227,7 @@ class Edge(object):
             self.tgt = target;
             self.lab = self.normal;
             self.normal = None;
-            
+
     def encode(self):
         json = {"source": self.src, "target": self.tgt, "label": self.lab};
         if self.normal:
@@ -250,7 +250,7 @@ class Edge(object):
         if attributes is None: attributes = json.get("properties", None)
         values = json.get("values", None)
         return Edge(src, tgt, lab, normal, attributes, values)
-        
+
     def dot(self, stream, input = None, strings = False):
         label = self.lab;
         if label and self.normal:
@@ -265,7 +265,7 @@ class Edge(object):
               "".format(self.src, self.tgt, label if label else "",
                         style),
               file = stream);
-        
+
     def __key(self):
         return self.tgt, self.src, self.lab
 
@@ -290,6 +290,11 @@ class Graph(object):
         self.framework = framework;
         self.intermediate_gold = []
         self.gold_indexes = []
+        self.tokens = []
+        self.lemmas = []
+        self.pos_tags = []
+        self.ner_tags = []
+        self.abstract_map = {}
 
     def add_node(self, id = None, label = None,
                  properties = None, values = None,
@@ -333,6 +338,41 @@ class Graph(object):
             elif not quiet:
                 print("add_input(): no text for key {}.".format(id),
                       file = sys.stderr);
+
+    def add_tokens(self, tokens, id = None, quiet = False):
+        if not id: id = self.id;
+        if isinstance(tokens, list):
+            self.tokens = tokens;
+        else:
+            print("add_input(): tokens is not a list {}.".format(tokens));
+
+    def add_lemmas(self, lemmas, id = None, quiet = False):
+        if not id: id = self.id;
+        if isinstance(lemmas, list):
+            self.lemmas = lemmas;
+        else:
+            print("add_input(): lemmas is not a list {}.".format(lemmas));
+
+    def add_pos_tags(self, pos_tags, id = None, quiet = False):
+        if not id: id = self.id;
+        if isinstance(pos_tags, list):
+            self.pos_tags = pos_tags;
+        else:
+            print("add_input(): pos_tags is not a list {}.".format(pos_tags));
+
+    def add_ner_tags(self, ner_tags, id = None, quiet = False):
+        if not id: id = self.id;
+        if isinstance(ner_tags, list):
+            self.ner_tags = ner_tags;
+        else:
+            print("add_input(): ner_tags is not a list {}.".format(ner_tags));
+
+    def add_abstract_map(self, abstract_map, id = None, quiet = False):
+        if not id: id = self.id;
+        if isinstance(abstract_map, dict):
+            self.abstract_map = abstract_map;
+        else:
+            print("add_input(): abstract_map is not a dict {}.".format(abstract_map));
 
     def anchor(self):
         n = len(self.input);
@@ -459,7 +499,7 @@ class Graph(object):
         json["edges"] = [edge.encode() for edge in self.edges];
         json["intermediate_gold"] = [node.encode() for node in self.intermediate_gold];
         json["gold_indexes"] = self.gold_indexes
-        
+
         return json;
 
     @staticmethod
